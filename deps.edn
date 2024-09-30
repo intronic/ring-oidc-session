@@ -3,11 +3,21 @@
         ring/ring-core      {:mvn/version "1.12.2"}}
  :aliases
  {:test
+  ; `clj -M:test` to run tests
+  ; see https://github.com/cognitect-labs/test-runner
   {:extra-paths ["test"]
    :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
-                io.github.cognitect-labs/test-runner
-                {:git/tag "v0.5.1" :git/sha "dfb30dd"}
-                ring/ring-mock {:mvn/version "0.4.0"}}}
+                io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                ring/ring-mock {:mvn/version "0.4.0"}}
+   :main-opts ["-m" "cognitect.test-runner"]
+   :exec-fn cognitect.test-runner.api/test}
+
+  ; `clj -M:test:coverage` to generate coverage in target/coverage/index.html
+  ; see https://github.com/cloverage/cloverage
+  :coverage {:extra-deps {cloverage/cloverage {:mvn/version "1.2.4"}}
+             :main-opts ["-m" "cloverage.coverage" "-p" "src" "-s" "test" "-o" "target/coverage"]}
+
+  ; see build.clj
   :build {:deps {io.github.clojure/tools.build
                  {:mvn/version "0.10.5"}
                  slipset/deps-deploy {:mvn/version "0.2.2"}}

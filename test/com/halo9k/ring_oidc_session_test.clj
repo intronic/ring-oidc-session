@@ -1,6 +1,7 @@
 (ns com.halo9k.ring-oidc-session-test
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.string :as str]
+            [ring.util.response]
             [ring.mock.request :as mock]
             [ring.util.codec :as codec]
             [com.halo9k.ring-oidc-session :as oidc :refer [wrap-oidc-session]]))
@@ -40,6 +41,28 @@
       (is (= (:status resp) 302))
       (is (= (:headers resp) {"Location" "/"}))))
 
+  (testing "make-ring-logout-handler ring async"
+    (let [res (atom nil)
+          req (assoc (mock/request :get "/anything") :session "mocksession")
+          _resp ((#'oidc/make-ring-logout-handler test-profile)
+                 req
+                 (fn respond [response] (reset! res response))
+                 (fn raise [error] (reset! res error)))]
+      (is (= (:status @res) 302))
+      (is (= (:status _resp) 302))
+      (is (= (:headers @res) {"Location" (:post-logout-uri test-profile)}))
+      (is (= (:session @res) nil)))
+
+    ; error branch - mock redirect function to throw
+    (with-redefs [ring.util.response/redirect (fn [_] (throw (ex-info "err" {})))]
+      (let [res (atom nil)
+            req (assoc (mock/request :get "/anything") :session "mocksession")
+            resp ((#'oidc/make-ring-logout-handler test-profile)
+                  req
+                  (fn respond [response] (reset! res response))
+                  (fn raise [error] (reset! res error)))]
+        (is (instance? clojure.lang.ExceptionInfo @res)))))
+
   (testing "make-oidc-logout-handler"
     ; :id must be added to profile from enclosing map
     ; :id-token must be in request :session map
@@ -70,5 +93,32 @@
               [path query] (str/split location #"\?" 2)
               params (codec/form-decode query)]
           (is (= params {"id_token_hint" "mocktoken"
-                         "post_logout_redirect_uri" (str "http://localhost" "/")})))))))
+                         "post_logout_redirect_uri" (str "http://localhost" "/")}))))))
+
+  (testing "make-oidc-logout-handler ring async"
+    (let [res (atom nil)
+          test-prof (assoc test-profile :id "some-id")
+          req (assoc-in (mock/request :get "/anything") [:session :ring.middleware.oauth2/access-tokens "some-id" :id-token] "mocktoken")
+          _resp ((#'oidc/make-oidc-logout-handler test-prof)
+                 req
+                 (fn respond [response] (reset! res response))
+                 (fn raise [error] (reset! res error)))
+          location (get-in @res [:headers "Location"])
+          [path query] (str/split location #"\?" 2)
+          params (codec/form-decode query)]
+      (is (= (:status @res) 302))
+      (is (= (:status _resp) 302))
+      (is (= path (:end-session-uri test-profile)))
+      (is (= params {"id_token_hint" "mocktoken"
+                     "post_logout_redirect_uri" (str "http://localhost" (:post-logout-oidc-uri test-profile))}))
+
+      ; error branch - mock redirect function to throw
+      (with-redefs [ring.util.response/redirect (fn [_] (throw (ex-info "err" {})))]
+        (let [res (atom nil)
+              req (assoc (mock/request :get "/anything") :session "mocksession")
+              resp ((#'oidc/make-ring-logout-handler test-profile)
+                    req
+                    (fn respond [response] (reset! res response))
+                    (fn raise [error] (reset! res error)))]
+          (is (instance? clojure.lang.ExceptionInfo @res)))))))
 

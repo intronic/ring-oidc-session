@@ -27,9 +27,9 @@ Here's an example for your OIDC IdP that provides the `end_session` endpoint:
    routes
    {:your-oidc-provider
     {:end-session-uri    "{oidc_idp_domain}/oidc/v1/end_session"
-     :logout-ring-uri      "/your/logout/route"
      :logout-oidc-uri      "/your/end-session/route"
      :post-logout-oidc-uri "/your/end-session/callback"
+     :logout-ring-uri      "/your/logout/route"
      :post-logout-uri      "/your-logged-out-dest"
     }}))
 ```
@@ -38,15 +38,15 @@ Keys:
 
 * `:end-session-uri`
     * The OIDC IdP `end-session` endpoint
-* `:logout-ring-uri`
-    * logout of app (ring session), leaving oidc session intact
-    * redirects to `:post-logout-uri`
 * `:logout-oidc-uri`
     * logout of app and end OIDC session
     * redirects to `:post-logout-oidc-uri` (or `:post-logout-uri`, see below)
 * `:post-logout-oidc-uri`
     * optional oidc end-session callback
     * if not present, defaults to `:post-logout-uri`
+* `:logout-ring-uri`
+    * logout of app (ring session), leaving oidc session intact
+    * redirects to `:post-logout-uri`
 * `:post-logout-uri`
     * optional final redirect
     * if not present, defaults to `:landing-uri` (from the `wrap-oauth2` profile map), otherwise defaults to `/`
@@ -93,6 +93,20 @@ variables (requires the `ci` task be run first):
     $ clojure -T:build deploy
 
 Your library will be deployed to com.halo9k/ring-oidc-session on clojars.org by default.
+
+### Test coverage
+
+* See [test-coverage][]
+
+* Run tests and produce fully annotatated source coverage report in `target/coverage/`:
+
+```bash
+clj -M:test:coverage
+firefox target/coverage/index.html
+```
+
+
+[test-coverage]: https://github.com/cloverage/cloverage
 
 ## License
 
