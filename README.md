@@ -2,7 +2,10 @@
 
 [Ring][] middleware that adds OIDC session handling.
 Based on and to be used together with  [ring-oauth2][].
-Provides handling for the OIDC `end_session` endpoint.
+
+* Adds an app route for the OIDC `end_session` endpoint which also clears the ring `:session` key.
+    * Optionally provides for a separate OIDC callback route.
+* Adds an app route that clears the ring `:session` key but leaves the OIDC session intact.
 
 [ring]: https://github.com/ring-clojure/ring
 [oauth 2.0]: https://oauth.net/2/
@@ -104,7 +107,6 @@ Your library will be deployed to com.halo9k/ring-oidc-session on clojars.org by 
 clj -M:test:coverage
 firefox target/coverage/index.html
 ```
-
 
 [test-coverage]: https://github.com/cloverage/cloverage
 
