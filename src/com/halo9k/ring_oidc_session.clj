@@ -1,6 +1,6 @@
 (ns com.halo9k.ring-oidc-session
   (:require [ring.util.request :as req]
-            [ring.util.response :as res]
+            [ring.util.http-response :as http]
             [ring.util.codec :as codec]))
 
 (defn- resolve-uri
@@ -16,11 +16,8 @@
   [{:keys [post-logout-uri landing-uri] :as _profile}]
   (fn handler
     ([_request]
-     (-> (res/redirect (or post-logout-uri landing-uri "/")) (assoc :session nil)))
-    ([request respond raise]
-     (when-let [response (try (handler request)
-                              (catch Exception e (raise e) false))]
-       (respond response)))))
+     (-> (http/found (or post-logout-uri landing-uri "/")) (assoc :session nil)))
+    ([request respond _] (respond (handler request))))) ; no need for try/raise here as redirect is a simple map
 
 (defn- make-oidc-logout-handler
   "Remove ring session and redirect to OIDC end_session endpoint."
@@ -31,7 +28,7 @@
          (str "?" (ring.util.codec/form-encode
                    {:id_token_hint (get-in request [:session :ring.middleware.oauth2/access-tokens id :id-token])
                     :post_logout_redirect_uri (resolve-uri (or post-logout-oidc-uri post-logout-uri landing-uri "/") request)}))
-         (res/redirect)
+         (http/found)
          (assoc :session nil)))
     ([request respond raise]
      (when-let [response (try (handler request)
