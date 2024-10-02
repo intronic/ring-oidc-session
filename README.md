@@ -3,8 +3,13 @@
 [Ring][] middleware that adds OIDC session handling.
 Based on and to be used together with  [ring-oauth2][].
 
+* If `ring-oauth2` id & access tokens are found in the request for a profile keyword
+    `[:session :ring.middleware.oauth2/access-tokens <profile-keyword>]`
+  the OIDC `user_info` endpoint for that profile is queried with the access token and if valid the user info is stored in a user info map in the ring session:
+    `[:session :com.halo9k/ring-oidc-session <profile-keyword> {user info}]`
 * Adds an app route for the OIDC `end_session` endpoint which also clears the ring `:session` key.
     * Optionally provides for a separate OIDC callback route.
+    * This is the Single Sign Out counterpart to Single Sign On (SSO).
 * Adds an app route that clears the ring `:session` key but leaves the OIDC session intact.
 
 [ring]: https://github.com/ring-clojure/ring

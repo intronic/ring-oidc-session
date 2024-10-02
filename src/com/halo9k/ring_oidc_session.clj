@@ -37,11 +37,11 @@
 
 (defn wrap-oidc-session [handler profiles]
   (let [profiles (for [[k v] profiles] (assoc v :id k))
-        logout-ring (into {} (map (juxt :logout-ring-uri identity)) profiles)
-        logout-oidc (into {} (map (juxt :logout-oidc-uri identity)) profiles)]
-    (fn [{:keys [uri] :as request}]
-      (if-let [profile (logout-ring uri)]
-        ((make-ring-logout-handler profile) request)
-        (if-let [profile (logout-oidc uri)]
-          ((make-oidc-logout-handler profile) request)
+        logout-ring (into {} (map (juxt :logout-ring-uri make-ring-logout-handler)) profiles)
+        logout-oidc (into {} (map (juxt :logout-oidc-uri make-oidc-logout-handler)) profiles)]
+    (fn [{:keys [uri session] :as request}]
+      (if-let [ring-logout-handler (logout-ring uri)]
+        (ring-logout-handler request)
+        (if-let [oidc-logout-handler (logout-oidc uri)]
+          (oidc-logout-handler request)
           (handler request))))))
