@@ -2,7 +2,6 @@
 
 [Ring][] middleware that adds OIDC session handling (`userinfo` and `end_session` endpoints).
 Based on and to be used together with  [ring-oauth2][].
-Used with "Web App or  OIDC
 
 The middleware function to use is `ring-oidc-session/wrap-oidc-session`.
 
