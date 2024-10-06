@@ -3,7 +3,7 @@
   (:require [clojure.tools.build.api :as b]
             [deps-deploy.deps-deploy :as dd]))
 
-(def lib 'intronic/ring-oidc-session)
+(def lib 'com.halo9000/ring-oidc-session)
 #_(def version "0.1.0-SNAPSHOT")
  ; alternatively, use MAJOR.MINOR.COMMITS:
 (def version (format "1.0.%s" (b/git-count-revs nil)))

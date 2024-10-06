@@ -1,4 +1,4 @@
-(ns intronic.ring-oidc-session-test
+(ns com.halo9000.ring-oidc-session-test
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.string :as str]
             [ring.util.http-response :as http]
@@ -6,7 +6,7 @@
             [ring.mock.request :as mock]
             [ring.util.codec :as codec]
             [clj-http.client]
-            [intronic.ring-oidc-session :as oidc :refer [wrap-oidc-session]]))
+            [com.halo9000.ring-oidc-session :as oidc :refer [wrap-oidc-session]]))
 
 
 (def profiles-config
@@ -165,7 +165,7 @@
             (let [request (assoc-in (mock/request :get uri)
                                     [:session :ring.middleware.oauth2/access-tokens]
                                     (simulate-oauth2-token- id "tok" "id-tok"))]
-              (is (= (assoc request :intronic.ring-oidc-session/userinfo user-info)
+              (is (= (assoc request :com.halo9000.ring-oidc-session/userinfo user-info)
                      (handler request))))))))
 
     (testing "request is unchanged for other config URIs"
@@ -207,9 +207,9 @@
             (let [request (assoc-in (mock/request :get uri)
                                     [:session :ring.middleware.oauth2/access-tokens]
                                     (simulate-oauth2-token- id "tok" "id-tok"))]
-              (is (= (assoc request :intronic.ring-oidc-session/userinfo user-info)
+              (is (= (assoc request :com.halo9000.ring-oidc-session/userinfo user-info)
                      (handler request success-fn error-fn)))
-              (is (= (assoc request :intronic.ring-oidc-session/userinfo user-info)
+              (is (= (assoc request :com.halo9000.ring-oidc-session/userinfo user-info)
                      @res))
               (is (= nil @err)))))))
 

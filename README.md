@@ -1,4 +1,4 @@
-# intronic/ring-oidc-session [![Build Status](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml/badge.svg)](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml)
+# com.halo9000/ring-oidc-session [![Build Status](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml/badge.svg)](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml)
 
 [Ring][] middleware that adds OIDC session handling (`userinfo` and `end_session` endpoints).
 Based on and to be used together with  [ring-oauth2][].
@@ -58,7 +58,7 @@ This should be placed above the `wrap-oauth2` handler, where `oidc-profile-map` 
 
 Invoke a library API function from the command-line:
 
-    $ clojure -X intronic.ring-oidc-session/foo :a 1 :b '"two"'
+    $ clojure -X com.halo9000.ring-oidc-session/foo :a 1 :b '"two"'
     {:a 1, :b "two"} "Hello, World!"
 
 Run the project's tests (they'll fail until you edit them):
@@ -82,7 +82,7 @@ variables (requires the `ci` task be run first):
 
     $ clojure -T:build deploy
 
-Your library will be deployed to intronic/ring-oidc-session on clojars.org by default.
+Your library will be deployed to com.halo9000/ring-oidc-session on clojars.org by default.
 
 ### Test coverage
 
