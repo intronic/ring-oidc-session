@@ -1,3 +1,4 @@
+.env
 .calva/output-window/
 .calva/repl.calva-repl
 .classpath

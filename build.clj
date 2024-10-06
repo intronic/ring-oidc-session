@@ -3,7 +3,7 @@
   (:require [clojure.tools.build.api :as b]
             [deps-deploy.deps-deploy :as dd]))
 
-(def lib 'com.halo9k/ring-oidc-session)
+(def lib 'intronic/ring-oidc-session)
 #_(def version "0.1.0-SNAPSHOT")
  ; alternatively, use MAJOR.MINOR.COMMITS:
 (def version (format "1.0.%s" (b/git-count-revs nil)))
@@ -13,15 +13,15 @@
   (let [basis    (b/create-basis {:aliases [:test]})
         cmds     (b/java-command
                   {:basis      basis
-                    :main      'clojure.main
-                    :main-args ["-m" "cognitect.test-runner"]})
+                   :main      'clojure.main
+                   :main-args ["-m" "cognitect.test-runner"]})
         {:keys [exit]} (b/process cmds)]
     (when-not (zero? exit) (throw (ex-info "Tests failed" {}))))
   opts)
 
 (defn- pom-template [version]
   [[:description "Clojure Ring OIDC session handling."]
-   [:url "https://github.com/halo9k/ring-oidc-session"]
+   [:url "https://github.com/intronic/ring-oidc-session"]
    [:licenses
     [:license
      [:name "The MIT License"]
@@ -30,20 +30,20 @@
     [:developer
      [:name "Mike"]]]
    [:scm
-    [:url "https://github.com/halo9k/ring-oidc-session"]
-    [:connection "scm:git:https://github.com/halo9k/ring-oidc-session.git"]
-    [:developerConnection "scm:git:ssh:git@github.com:halo9k/ring-oidc-session.git"]
+    [:url "https://github.com/intronic/ring-oidc-session"]
+    [:connection "scm:git:https://github.com/intronic/ring-oidc-session.git"]
+    [:developerConnection "scm:git:ssh:git@github.com:intronic/ring-oidc-session.git"]
     [:tag (str "v" version)]]])
 
 (defn- jar-opts [opts]
   (assoc opts
-          :lib lib   :version version
-          :jar-file  (format "target/%s-%s.jar" lib version)
-          :basis     (b/create-basis {})
-          :class-dir class-dir
-          :target    "target"
-          :src-dirs  ["src"]
-          :pom-data  (pom-template version)))
+         :lib lib   :version version
+         :jar-file  (format "target/%s-%s.jar" lib version)
+         :basis     (b/create-basis {})
+         :class-dir class-dir
+         :target    "target"
+         :src-dirs  ["src"]
+         :pom-data  (pom-template version)))
 
 (defn ci "Run the CI pipeline of tests (and build the JAR)." [opts]
   (test opts)

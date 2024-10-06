@@ -1,4 +1,4 @@
-(ns com.halo9k.ring-oidc-session
+(ns intronic.ring-oidc-session
   (:require [ring.util.request :as req]
             [ring.util.http-response :as http]
             [ring.util.http-status :as status]
