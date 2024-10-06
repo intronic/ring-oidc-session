@@ -1,64 +1,47 @@
 # com.halo9k/ring-oidc-session [![Build Status](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml/badge.svg)](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml)
 
-[Ring][] middleware that adds OIDC session handling.
+[Ring][] middleware that adds OIDC session handling (`userinfo` and `end_session` handling).
 Based on and to be used together with  [ring-oauth2][].
-
-* If `ring-oauth2` id & access tokens are found in the request for a profile keyword
-    `[:session :ring.middleware.oauth2/access-tokens <profile-keyword>]`
-  the OIDC `user_info` endpoint for that profile is queried with the access token and if valid the user info is stored in a user info map in the ring session:
-    `[:session :com.halo9k/ring-oidc-session <profile-keyword> {user info}]`
-* Adds an app route for the OIDC `end_session` endpoint which also clears the ring `:session` key.
-    * Optionally provides for a separate OIDC callback route.
-    * This is the Single Sign Out counterpart to Single Sign On (SSO).
-* Adds an app route that clears the ring `:session` key but leaves the OIDC session intact.
-
-[ring]: https://github.com/ring-clojure/ring
-[oauth 2.0]: https://oauth.net/2/
-[ring-oauth2]: https://github.com/weavejester/ring-oauth2
-
-## Usage
+Used with "Web App or  OIDC
 
 The middleware function to use is `ring-oidc-session/wrap-oidc-session`.
-This takes a Ring handler, and a map of profiles as arguments. Each
-profile has a key to identify it, and a map of options that define how
-to authorize against a third-party service.
 
-This adds some keys to the map in the [ring-oauth2][] example.
-
-Here's an example for your OIDC IdP that provides the `end_session` endpoint:
+* Four config entries are added to the `ring-oauth2` profile map:
 
 ```clojure
 (require '[ring-oidc-session :refer [wrap-oidc-session]])
 
-(def handler
-  (wrap-oidc-session
-   routes
-   {:your-oidc-provider
-    {:end-session-uri    "{oidc_idp_domain}/oidc/v1/end_session"
-     :logout-oidc-uri      "/your/end-session/route"
-     :post-logout-oidc-uri "/your/end-session/callback"
-     :logout-ring-uri      "/your/logout/route"
-     :post-logout-uri      "/your-logged-out-dest"
-    }}))
+  (-> handler
+    (wrap-oidc-session
+      {:your-oidc-provider
+        {; ... other ring-oauth2 options...
+        :userinfo-uri     "{oidc_idp_domain}/oidc/v1/userinfo"
+        :end-session-uri  "{oidc_idp_domain}/oidc/v1/end_session"
+        :logout-oidc-uri  "/your/end-oidc-session/route"
+        :logout-ring-uri  "/your/logout/route"
+        })
+  )
 ```
 
-Keys:
+* `wrap-oidc-session` uses the config to add one request-modifying middleware and 3 ring routes
 
-* `:end-session-uri`
-    * The OIDC IdP `end-session` endpoint
-* `:logout-oidc-uri`
-    * logout of app and end OIDC session
-    * redirects to `:post-logout-oidc-uri` (or `:post-logout-uri`, see below)
-* `:post-logout-oidc-uri`
-    * optional oidc end-session callback
-    * if not present, defaults to `:post-logout-uri`
-* `:logout-ring-uri`
-    * logout of app (ring session), leaving oidc session intact
-    * redirects to `:post-logout-uri`
-* `:post-logout-uri`
-    * optional final redirect
-    * if not present, defaults to `:landing-uri` (from the `wrap-oauth2` profile map), otherwise defaults to `/`
+* A request-modifying middleware will be applied to the `:landing-uri` route:
+  * If `:ring.middleware.oauth2/access-tokens` are found in the `:session` key of the request then the OIDC userinfo endpoint (`:userinfo-uri`) will be queried.
+    * The profile id (eg: `:your-oidc-provider`, above) will be used to find the profile with the `:userinfo-uri`.
+  * On successful validation, the userinfo results will be added to the request under the key: `::userinfo`.
+  * On validation failure, the `::userinfo` request key will be associated with a `nil` value.
 
+* A `:logout-oidc-uri` route will be added which will clear the ring session and redirect the user to the OIDC end_session endpoint (`:end-session-uri`).
+  * The OIDC IdP should redirect the user to a preconfigured app URI.
+  * This is the Single Sign Out counterpart to Single Sign On (SSO).
+  * This should clear any user sessions with the OIDC IdP, as well as the users ring session.
+
+* A `:logout-ring-uri` route will be added which will clear the ring session (but leave the OIDC IdP session intact).
+
+
+[ring]: https://github.com/ring-clojure/ring
+[oauth 2.0]: https://oauth.net/2/
+[ring-oauth2]: https://github.com/weavejester/ring-oauth2
 
 ### Middleware Order
 
