@@ -4,8 +4,8 @@
             [deps-deploy.deps-deploy :as dd]))
 
 (def lib 'com.halo9k/ring-oidc-session)
-(def version "0.1.0-SNAPSHOT")
-#_ ; alternatively, use MAJOR.MINOR.COMMITS:
+#_(def version "0.1.0-SNAPSHOT")
+ ; alternatively, use MAJOR.MINOR.COMMITS:
 (def version (format "1.0.%s" (b/git-count-revs nil)))
 (def class-dir "target/classes")
 
@@ -20,12 +20,12 @@
   opts)
 
 (defn- pom-template [version]
-  [[:description "FIXME: my new library."]
+  [[:description "Clojure Ring OIDC session handling."]
    [:url "https://github.com/halo9k/ring-oidc-session"]
    [:licenses
     [:license
-     [:name "Eclipse Public License"]
-     [:url "http://www.eclipse.org/legal/epl-v10.html"]]]
+     [:name "The MIT License"]
+     [:url "http://opensource.org/licenses/MIT"]]]
    [:developers
     [:developer
      [:name "Mike"]]]
