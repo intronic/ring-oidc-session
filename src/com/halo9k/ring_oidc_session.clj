@@ -67,14 +67,16 @@
   "If request has a valid token, add ::userinfo key with results from OIDC userinfo_endpoint before calling next handler."
   [handler profile-map]
   (let [landing-uri (into #{} (map :landing-uri (vals profile-map)))]
+    #_(log/log :info ['wrap-userinfo->landing-uri landing-uri 'keys (keys profile-map)])
     (fn userinfo-handler
       ([request]
+       #_(log/log :info ['wrap-userinfo->uri (:uri request) 'is-prefix? (landing-uri (:uri request))])
        (if (landing-uri (:uri request))
          (let [[id token-map] (get-ring-oauth2-entry request)
                userinfo (when-let [token (:token token-map)]
                           (let [userinfo-uri (get-in profile-map [id :userinfo-uri])]
                             (fetch-oidc-userinfo userinfo-uri token)))]
-           (log/log :info ['wrap-userinfo id (:uri request) landing-uri userinfo])
+           #_(log/log :info ['wrap-userinfo->process id (:uri request) landing-uri [id token-map] userinfo])
            (handler (assoc request ::userinfo userinfo)))
          (handler request)))
       ([request respond raise]
