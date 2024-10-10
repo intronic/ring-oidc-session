@@ -43,6 +43,7 @@
   (testing "test-api-fetch"
     (with-redefs [clj-http.client/get (fn [uri token] [uri token])]
       (is (= ["uri" {:accept :json
+                     :as :json
                      :oauth-token "TOKEN"}]
              (#'oidc/api-fetch "uri" "TOKEN")))))
 

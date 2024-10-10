@@ -17,6 +17,7 @@
 
 (defn- api-fetch [uri access-token]
   (m/? (m/via m/blk (client/get uri {:accept :json
+                                     :as :json
                                      :oauth-token access-token}))))
 
 (defn- make-ring-logout-handler
