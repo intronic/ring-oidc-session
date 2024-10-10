@@ -34,7 +34,7 @@ jobs:
         clojure --version
 
     - name: Install dependencies
-        run: clojure -P
+      run: clojure -P
 
     - name: Run tests
       run: clojure -T:build test
