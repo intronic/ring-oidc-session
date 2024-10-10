@@ -12,8 +12,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Prepare java
+      uses: actions/setup-java@v4
+        distribution: 'zulu'
+        java-version: '21'
+
+    - name: Install clojure tools
+      uses: DeLaGuardo/setup-clojure@12.5
+      with:
+        cli: latest              # Clojure CLI based on tools.deps
+        # bb: 0.7.8              # Babashka
+
+    - name: Versions
+      run: |
+        lsb_release -a
+        java --version
+        clojure --version
+
     - name: Install dependencies
       run: clojure -P
+
     - name: Run tests
       run: clojure -T:build test
