@@ -1,4 +1,4 @@
-# com.halo9000/ring-oidc-session [![Build Status](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml/badge.svg)](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml)
+# com.halo9000/ring-oidc-session  [![Build Status](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml/badge.svg)](https://github.com/intronic/ring-oidc-session/actions/workflows/test.yml)  [![Clojars Project](https://img.shields.io/clojars/v/com.halo9000/ring-oidc-session.svg)](https://clojars.org/com.halo9000/ring-oidc-session)
 
 [Ring][] middleware that adds OIDC session handling (`userinfo` and `end_session` endpoints).
 Based on and to be used together with  [ring-oauth2][].
