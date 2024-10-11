@@ -52,7 +52,19 @@ This should be placed above the `wrap-oauth2` handler, where `oidc-profile-map` 
    (wrap-oauth2 oidc-profile-map)
    ...middleware...
 ```
+#### State mismatch error
 
+* If ring-oauth2 returns a `State mismatch` error, you likely need to add `SameSite:Lax` cookie option
+  to allow for cross-site GET cookie for auth state.
+  * See notes at [ring-oauth2][].
+* Plus, in production you shauld review the site defaults (eg use secure-site-defaults and possibly :proxy true).
+  * See notes at [ring-defaults][].
+
+```clojure
+    (wrap-defaults (-> ringdef/site-defaults (assoc-in [:session :cookie-attrs :same-site] :lax)))
+    (wrap-params)
+```
+[ring-defaults]: https://github.com/ring-clojure/ring-defaults
 
 ## Notes
 
