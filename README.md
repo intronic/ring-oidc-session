@@ -89,6 +89,10 @@ Install it locally (requires the `ci` task be run first):
 
     $ clojure -T:build install
 
+Apply (and push) the version tag to the git repo:
+
+    $ clojure -T:build git-tag-version
+
 Deploy it to Clojars -- needs `CLOJARS_USERNAME` and `CLOJARS_PASSWORD` environment
 variables (requires the `ci` task be run first):
 

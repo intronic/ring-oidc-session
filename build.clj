@@ -35,7 +35,7 @@
     [:developerConnection "scm:git:ssh:git@github.com:intronic/ring-oidc-session.git"]
     [:tag (str "v" version)]]])
 
-(defn git-tag-version "Apply and push git version tag." []
+(defn git-tag-version "Apply and push git version tag." [_opts]
   (b/git-process {:git-args ["tag" (str "v" version)]})
   (b/git-process {:git-args ["push" "origin" "tag" (str "v" version)]}))
 
