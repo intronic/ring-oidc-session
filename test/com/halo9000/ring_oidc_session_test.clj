@@ -4,6 +4,7 @@
             [ring.util.http-response :as http]
             [ring.util.http-status :as status]
             [ring.mock.request :as mock]
+            [slingshot.slingshot :refer [throw+]]
             [ring.util.codec :as codec]
             [clj-http.client]
             [com.halo9000.ring-oidc-session :as oidc :refer [wrap-oidc-session]]))
@@ -54,28 +55,26 @@
     (is (= "http://localhost/xyz"
            (#'oidc/resolve-uri "xyz" (mock/request :get "/abc"))))))
 
-(deftest test-api-fetch
+(deftest test-api-get
   (testing "passes parameters"
     (with-redefs [clj-http.client/get (fn [url req] [url req])]
       (is (= ["uri" {:accept :json
                      :as :json
                      :oauth-token "TOKEN"}]
-             (#'oidc/api-fetch "uri" "TOKEN"))))))
+             (#'oidc/api-get "uri" "TOKEN"))))))
 
 (deftest test-api-post
   (testing "passes parameters"
     (with-redefs [clj-http.client/post (fn [url req] [url req])]
       (is (= ["uri"
-              {:body {:id 1 :token "REFRESH"}
-               :accept :json
-               :as :json
+              {:form-params {:id 1 :token "REFRESH"}
                :oauth-token "TOKEN"}]
              (#'oidc/api-post "uri" {:id 1 :token "REFRESH"} "TOKEN"))))))
 
 (deftest test-post-oidc-revoke
   (testing "success"
-    (with-redefs [oidc/api-post (fn [uri body access-token] (http/ok {:uri uri :body body :token access-token}))]
-      (is (= {:uri "/abc" :body {:client-id "123" :token "REFRESH"} :token "TOK"}
+    (with-redefs [oidc/api-post (fn [uri params access-token] (http/ok {:uri uri :form-params params :token access-token}))]
+      (is (= {:uri "/abc" :form-params {:client_id "123" :token "REFRESH"} :token "TOK"}
              (oidc/post-oidc-revoke "/abc" "TOK" "123" "REFRESH")))))
   ;; TODO: add failure modes
   )
@@ -165,17 +164,16 @@
 
 (deftest test-fetch-oidc-userinfo
   (testing "success modes"
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/ok {:uri uri :token access-token}))]
+    (with-redefs [oidc/api-get (fn [uri access-token] (http/ok {:uri uri :token access-token}))]
       (is (= {:uri "/abc" :token "TOK"} (oidc/fetch-oidc-userinfo "/abc" "TOK"))))
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/unauthorized {:uri uri :token access-token}))]
+    (with-redefs [oidc/api-get (fn [uri access-token] (throw+ (http/unauthorized {:uri uri :token access-token})))]
       (is (nil? (oidc/fetch-oidc-userinfo "/abc" "TOK"))))
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/im-a-teapot {:uri uri :token access-token}))]
+    (with-redefs [oidc/api-get (fn [uri access-token] (throw+ (http/im-a-teapot {:uri uri :token access-token})))]
       (is (nil? (oidc/fetch-oidc-userinfo "/abc" "TOK")))))
 
   (testing "failure modes"
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (throw (ex-info "failed" {:uri uri :token access-token})))]
-      (is (thrown? clojure.lang.ExceptionInfo
-                   (oidc/fetch-oidc-userinfo "/abc" "TOK"))))))
+    (with-redefs [oidc/api-get (fn [uri access-token] (throw+ (ex-info "failed" {:uri uri :token access-token})))]
+      (is (nil? (oidc/fetch-oidc-userinfo "/abc" "TOK"))))))
 
 
 (defn simulate-oauth2-token- [profile-key token id-token] {profile-key {:token token :id-token id-token}})
