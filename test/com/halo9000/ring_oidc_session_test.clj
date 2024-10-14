@@ -8,14 +8,19 @@
             [clj-http.client]
             [com.halo9000.ring-oidc-session :as oidc :refer [wrap-oidc-session]]))
 
+;; suppress log messages
+(alter-var-root #'oidc/*LOG-401* (constantly false))
+(alter-var-root #'oidc/*LOG-OTHER* (constantly false))
 
 (def profiles-config
   ; minimal example
   {:minimal-profile {:userinfo-uri    "https://example.com/oidc/v1/userinfo"
                      :end-session-uri "https://example.com/oidc/v1/end_session"
+                     :revocation-uri  "https://example.com/oauth2/revoke"
                      :logout-oidc-uri "/app/end-session"
                      :logout-ring-uri "/app/logout"
-                     :landing-uri     "/home"}
+                     :landing-uri     "/home"
+                     :client-id        "CLIENTID"}
 
   ; modified from ring-oauth2 example (:github profile in https://github.com/weavejester/ring-oauth2#usage)
   ;   github.com for instance does not implement OIDC end_session endpoint
@@ -26,89 +31,152 @@
                       :launch-uri       "/eg-ring-oauth2/test"
                       :landing-uri      "/"
                       :scopes           [:user :project]
-                      :client-id        "abcdef"
+                      :client-id        "EXTENDEDID"
                       :client-secret    "01234567890abcdef"
                       :userinfo-uri    "https://example.com/eg-ring-oauth2/oidc/v1/userinfo"
+                      :revocation-uri  "https://example.com/eg-ring-oauth2/revoke"
                       :end-session-uri "https://example.com/eg-ring-oauth2/oidc/v1/end_session"
                       :logout-oidc-uri "/eg-ring-oauth2/end-session"
                       :logout-ring-uri "/eg-ring-oauth2/logout"}})
 
-(defn- logged-out-redirect [url] (assoc (http/found url) :session nil))
+(defn add-id [profiles id]
+  (assoc (get profiles id) :id id))
 
-(deftest test-private-helpers
-  (testing "test-resolve-uri"
+(defn get-redirect-response-path-and-params [response]
+  (let [location (get-in response [:headers "Location"])
+        [path query] (str/split location #"\?" 2)]
+    [path (codec/form-decode query)]))
+
+(defn logged-out-redirect [url] (assoc (http/found url) :session nil))
+
+(deftest test-resolve-uri
+  (testing "resolves"
     (is (= "http://localhost/xyz"
-           (#'oidc/resolve-uri "xyz" (mock/request :get "/abc")))))
+           (#'oidc/resolve-uri "xyz" (mock/request :get "/abc"))))))
 
-  (testing "test-api-fetch"
-    (with-redefs [clj-http.client/get (fn [uri token] [uri token])]
+(deftest test-api-fetch
+  (testing "passes parameters"
+    (with-redefs [clj-http.client/get (fn [url req] [url req])]
       (is (= ["uri" {:accept :json
                      :as :json
                      :oauth-token "TOKEN"}]
-             (#'oidc/api-fetch "uri" "TOKEN")))))
+             (#'oidc/api-fetch "uri" "TOKEN"))))))
 
-  (testing "make-ring-logout-handler"
+(deftest test-api-post
+  (testing "passes parameters"
+    (with-redefs [clj-http.client/post (fn [url req] [url req])]
+      (is (= ["uri"
+              {:body {:id 1 :token "REFRESH"}
+               :accept :json
+               :as :json
+               :oauth-token "TOKEN"}]
+             (#'oidc/api-post "uri" {:id 1 :token "REFRESH"} "TOKEN"))))))
+
+(deftest test-post-oidc-revoke
+  (testing "success"
+    (with-redefs [oidc/api-post (fn [uri body access-token] (http/ok {:uri uri :body body :token access-token}))]
+      (is (= {:uri "/abc" :body {:client-id "123" :token "REFRESH"} :token "TOK"}
+             (oidc/post-oidc-revoke "/abc" "TOK" "123" "REFRESH")))))
+  ;; TODO: add failure modes
+  )
+
+(deftest test-make-ring-logout-handler
+  (let [test-prof (add-id profiles-config :minimal-profile)
+        acc-tok "TOK"
+        ref-tok "REFRESH"
+        sess {:ring.middleware.oauth2/access-tokens
+              {:minimal-profile
+               {:token acc-tok :refresh-token ref-tok :id-token "IDTOK"}}}
+        req (-> (mock/request :get "/assume-correct-path") (assoc  :session sess))]
+
+    (testing "handler"
       ; handler ignores request uri and simply redirects (assumes route is set correctly by caller)
-    (let [req (assoc (mock/request :get "/assume-correct-path") :session "mocksession")]
-      (is (= (logged-out-redirect (:landing-uri (profiles-config :minimal-profile)))
-             ((#'oidc/make-ring-logout-handler (profiles-config :minimal-profile)) req)))))
+      (let [post (atom nil)]
+        (with-redefs [com.halo9000.ring-oidc-session/post-oidc-revoke
+                      (fn [uri access-token client-id refresh-token]
+                        (reset! post [uri access-token client-id refresh-token]))]
+          (is (= (logged-out-redirect (:landing-uri test-prof))
+                 ((#'oidc/make-ring-logout-handler test-prof) req)))
+          (is (= [(:revocation-uri test-prof)
+                  acc-tok
+                  (:client-id test-prof)
+                  ref-tok]
+                 @post)))))
 
-  (testing "make-ring-logout-handler ring async"
-    (let [res (atom nil)
-          req (assoc (mock/request :get "/assume-correct-path") :session "mocksession")
-          _resp ((#'oidc/make-ring-logout-handler (profiles-config :minimal-profile))
-                 req
-                 (fn respond [response] (reset! res response))
-                 (fn raise [error] (reset! res error)))]
-      (is (= (logged-out-redirect (:landing-uri (profiles-config :minimal-profile)))
-             @res))
-      (is (= _resp @res))))
+    (testing "handler async"
+      (let [post (atom nil)]
+        (with-redefs [com.halo9000.ring-oidc-session/post-oidc-revoke
+                      (fn [uri access-token client-id refresh-token]
+                        (reset! post [uri access-token client-id refresh-token]))]
+          (let [res (atom nil)
+                resp ((#'oidc/make-ring-logout-handler test-prof)
+                      req
+                      (fn respond [response] (reset! res response))
+                      (fn raise [error] (reset! res error)))]
+            (is (= (logged-out-redirect (:landing-uri test-prof))
+                   @res))
+            (is (= resp @res))
+            (is (= [(:revocation-uri test-prof)
+                    acc-tok
+                    (:client-id test-prof)
+                    ref-tok]
+                   @post))))))))
 
-  (testing "make-oidc-logout-handler"
-      ; handler ignores request uri and simply redirects (assumes route is set correctly by caller)
-      ; :id is added to profile from enclosing map by caller
-      ; :id-token must be in request :session map
-    (let [test-prof (assoc (profiles-config :minimal-profile) :id :minimal-profile)
-          req (assoc-in (mock/request :get "/assume-correct-path") [:session :ring.middleware.oauth2/access-tokens :minimal-profile :id-token] "mocktoken")
-          resp ((#'oidc/make-oidc-logout-handler test-prof) req)
-          location (get-in resp [:headers "Location"])
-          [path query] (str/split location #"\?" 2)
-          params (codec/form-decode query)]
-      (is (= {:status status/found :session nil} (select-keys resp [:status :session])))
-      (is (= (:end-session-uri (profiles-config :minimal-profile)) path))
-      (is (= {"id_token_hint" "mocktoken"
-              "post_logout_redirect_uri" (str "http://localhost" (:landing-uri (profiles-config :minimal-profile)))}
-             params))))
+(deftest test-make-oidc-logout-handler
+  (let [res (atom nil)
+        test-prof (add-id profiles-config :minimal-profile)
+        req (assoc-in (mock/request :get "/assume-correct-path") [:session :ring.middleware.oauth2/access-tokens :minimal-profile :id-token] "mocktoken")]
 
-  (testing "make-oidc-logout-handler ring async"
-    (let [res (atom nil)
-          test-prof (assoc (profiles-config :minimal-profile) :id "some-id")
-          req (assoc-in (mock/request :get "/assume-correct-path") [:session :ring.middleware.oauth2/access-tokens "some-id" :id-token] "mocktoken")
-          _resp ((#'oidc/make-oidc-logout-handler test-prof)
-                 req
-                 (fn respond [response] (reset! res response))
-                 (fn raise [error] (reset! res error)))
-          location (get-in @res [:headers "Location"])
-          [path query] (str/split location #"\?" 2)
-          params (codec/form-decode query)]
-      (is (= {:status status/found :session nil} (select-keys @res [:status :session])))
-      (is (= _resp @res))
-      (is (= (:end-session-uri (profiles-config :minimal-profile))
-             path))
-      (is (= {"id_token_hint" "mocktoken"
-              "post_logout_redirect_uri" (str "http://localhost" (:landing-uri (profiles-config :minimal-profile)))}
-             params))
+    (testing "handler"
+        ; handler ignores request uri and simply redirects (assumes route is set correctly by caller)
+        ; :id is added to profile from enclosing map by caller
+        ; :id-token must be in request :session map
+      (let [resp ((#'oidc/make-oidc-logout-handler test-prof) req)
+            [path params] (get-redirect-response-path-and-params resp)]
+        (is (= {:status status/found :session nil} (select-keys resp [:status :session])))
+        (is (= (:end-session-uri test-prof) path))
+        (is (= {"id_token_hint" "mocktoken"
+                "post_logout_redirect_uri" (str "http://localhost" (:landing-uri test-prof))}
+               params))))
 
-      ; error branch - mock 'ring.util.codec/form-encode' function to throw in order to simulate error scenario
-      (with-redefs [ring.util.codec/form-encode (fn [_] (throw (ex-info "err" {})))]
-        (let [res (atom nil)
-              req (assoc (mock/request :get "/anything") :session "mocksession")
-              resp ((#'oidc/make-oidc-logout-handler (profiles-config :minimal-profile))
-                    req
-                    (fn respond [response] (reset! res response))
-                    (fn raise [error] (reset! res error)))]
-          (is (instance? clojure.lang.ExceptionInfo @res))
-          (is (= nil resp)))))))
+    (testing "handler async"
+      (let [resp ((#'oidc/make-oidc-logout-handler test-prof)
+                  req
+                  (fn respond [response] (reset! res response))
+                  (fn raise [error] (reset! res error)))
+            [path params] (get-redirect-response-path-and-params @res)]
+        (is (= {:status status/found :session nil} (select-keys @res [:status :session])))
+        (is (= (:end-session-uri test-prof) path))
+        (is (= {"id_token_hint" "mocktoken"
+                "post_logout_redirect_uri" (str "http://localhost" (:landing-uri test-prof))}
+               params))
+        (is (= resp @res))
+
+        ; error branch - mock 'ring.util.codec/form-encode' function to throw in order to simulate error scenario
+        (with-redefs [ring.util.codec/form-encode (fn [_] (throw (ex-info "err" {})))]
+          (let [res (atom nil)
+                req (assoc (mock/request :get "/anything") :session "mocksession")
+                resp ((#'oidc/make-oidc-logout-handler test-prof)
+                      req
+                      (fn respond [response] (reset! res response))
+                      (fn raise [error] (reset! res error)))]
+            (is (instance? clojure.lang.ExceptionInfo @res))
+            (is (= nil resp))))))))
+
+(deftest test-fetch-oidc-userinfo
+  (testing "success modes"
+    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/ok {:uri uri :token access-token}))]
+      (is (= {:uri "/abc" :token "TOK"} (oidc/fetch-oidc-userinfo "/abc" "TOK"))))
+    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/unauthorized {:uri uri :token access-token}))]
+      (is (nil? (oidc/fetch-oidc-userinfo "/abc" "TOK"))))
+    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/im-a-teapot {:uri uri :token access-token}))]
+      (is (nil? (oidc/fetch-oidc-userinfo "/abc" "TOK")))))
+
+  (testing "failure modes"
+    (with-redefs [oidc/api-fetch (fn [uri access-token] (throw (ex-info "failed" {:uri uri :token access-token})))]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (oidc/fetch-oidc-userinfo "/abc" "TOK"))))))
+
 
 (defn simulate-oauth2-token- [profile-key token id-token] {profile-key {:token token :id-token id-token}})
 
@@ -140,20 +208,6 @@
                      (oidc/get-ring-oauth2-entry (assoc-in (mock/request :get "/some-path")
                                                            [:session :ring.middleware.oauth2/access-tokens]
                                                            "some string"))))))))
-
-(deftest test-fetch-oidc-userinfo
-  (testing "success modes"
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/ok {:uri uri :token access-token}))]
-      (is (= {:uri "/abc" :token "TOK"} (oidc/fetch-oidc-userinfo "/abc" "TOK"))))
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/unauthorized {:uri uri :token access-token}))]
-      (is (nil? (oidc/fetch-oidc-userinfo "/abc" "TOK"))))
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (http/im-a-teapot {:uri uri :token access-token}))]
-      (is (nil? (oidc/fetch-oidc-userinfo "/abc" "TOK")))))
-
-  (testing "failure modes"
-    (with-redefs [oidc/api-fetch (fn [uri access-token] (throw (ex-info "failed" {:uri uri :token access-token})))]
-      (is (thrown? clojure.lang.ExceptionInfo
-                   (oidc/fetch-oidc-userinfo "/abc" "TOK"))))))
 
 (deftest test-wrap-userinfo
   (let [user-info {:user "bob"}]
@@ -247,31 +301,40 @@
   (is (= "http://example.com/def" (url-upto-query "http://example.com/def"))))
 
 (deftest test-wrap-oidc-session
-  ; profile name with expected [request response] uri keys
-  (doseq [[prof-key req->resp] {:minimal-profile [[:logout-oidc-uri :end-session-uri]
-                                                  [:logout-ring-uri :landing-uri]]
-                                :extended-profile [[:logout-oidc-uri :end-session-uri]
-                                                   [:logout-ring-uri :landing-uri]]}
-          [req-key resp-key] req->resp]
-    (testing (str "handler " prof-key ": " req-key " -> " resp-key)
-      (let [fallthrough-res (atom nil)
-            handler (wrap-oidc-session (make-dummy-401-responder fallthrough-res) profiles-config)
-            url (get-in profiles-config [prof-key req-key])
-            expected-url (get-in profiles-config [prof-key resp-key])
-            resp (handler (mock/request :get url))]
-        (is (= {:status status/found :session nil} (select-keys resp [:status :session])))
-        (is (= expected-url (url-upto-query (get-in resp [:headers "Location"]))))
-        (is (= nil @fallthrough-res)))))
+  ;; For each profile name (prof-key), query each request uri (req-key),
+  ;; and check the response matches the expected (exp-resp-key)
+  (with-redefs [clj-http.client/get (fn [url & _] (throw (ex-info "handler should not call GET" url)))
+                clj-http.client/post (fn [url & _]
+                                       ;; return dummy OK response on revocation, otherwise error
+                                       (if (str/includes? url "/revoke")
+                                         {:status 200 :body nil}
+                                         (throw (ex-info "handler should only POST on revocation-uri" url))))]
 
-  (testing "fallback path handler"
-    (doseq [unhandled-uri (conj
+    (doseq [[prof-key req->resp] {:minimal-profile [[:logout-oidc-uri :end-session-uri]
+                                                    [:logout-ring-uri :landing-uri]]
+                                  :extended-profile [[:logout-oidc-uri :end-session-uri]
+                                                     [:logout-ring-uri :landing-uri]]}
+            [req-key exp-resp-key] req->resp]
+      (testing (str "handler " prof-key ": " req-key " -> " exp-resp-key)
+        (let [fallthrough-res (atom nil)
+              handler (wrap-oidc-session (make-dummy-401-responder fallthrough-res) profiles-config)
+              url (get-in profiles-config [prof-key req-key])
+              expected-url (get-in profiles-config [prof-key exp-resp-key])
+            ;; call the handler with a mock request
+              resp (handler (mock/request :get url))]
+          (is (= {:status status/found :session nil} (select-keys resp [:status :session])))
+          (is (= expected-url (url-upto-query (get-in resp [:headers "Location"]))))
+          (is (= nil @fallthrough-res)))))
+
+    (testing "fallback path handler"
+      (doseq [unhandled-uri (conj
                            ; these should not have handlers
-                           (map #(get-in profiles-config %) [[:minimal-profile :landing-uri]
-                                                             [:extended-profile :landing-uri]])
+                             (map #(get-in profiles-config %) [[:minimal-profile :landing-uri]
+                                                               [:extended-profile :landing-uri]])
                            ; nor anything else
-                           "/some-other-uri")]
-      (let [fallthrough-res (atom nil)
-            handler (wrap-oidc-session (make-dummy-401-responder fallthrough-res) profiles-config)
-            resp (handler (mock/request :get unhandled-uri))]
-        (is (= (http/unauthorized) resp))
-        (is (= @fallthrough-res resp))))))
+                             "/some-other-uri")]
+        (let [fallthrough-res (atom nil)
+              handler (wrap-oidc-session (make-dummy-401-responder fallthrough-res) profiles-config)
+              resp (handler (mock/request :get unhandled-uri))]
+          (is (= (http/unauthorized) resp))
+          (is (= @fallthrough-res resp)))))))

@@ -5,7 +5,7 @@ Based on and to be used together with  [ring-oauth2][].
 
 The middleware function to use is `ring-oidc-session/wrap-oidc-session`.
 
-* Four config entries are added to the `ring-oauth2` profile map:
+* The following config entries are added to the `ring-oauth2` profile map:
 
 ```clojure
 (require '[ring-oidc-session :refer [wrap-oidc-session]])
@@ -13,11 +13,14 @@ The middleware function to use is `ring-oidc-session/wrap-oidc-session`.
   (-> handler
     (wrap-oidc-session
       {:your-oidc-provider
-        {; ... other ring-oauth2 options...
-        :userinfo-uri     "{oidc_idp_domain}/oidc/v1/userinfo"
-        :end-session-uri  "{oidc_idp_domain}/oidc/v1/end_session"
-        :logout-oidc-uri  "/your/end-oidc-session/route"
-        :logout-ring-uri  "/your/logout/route"
+        { ;; minimal options for this middleware:
+          :userinfo-uri     "{oidc_idp_domain}/oidc/v1/userinfo"
+          :revocation-uri   "{oidc_idp_domain}/oauth/v2/revoke"
+          :end-session-uri  "{oidc_idp_domain}/oidc/v1/end_session"
+          :logout-oidc-uri  "/your/end-oidc-session/route"
+          :logout-ring-uri  "/your/logout/route"
+          :client-id        "abcde" ; from ring-oauth2 options .. required for revocation endpoint
+          ;; ... other ring-oauth2 options...
         })
   )
 ```
@@ -32,11 +35,12 @@ The middleware function to use is `ring-oidc-session/wrap-oidc-session`.
 
 * A `:logout-oidc-uri` route will be added which will clear the ring session and redirect the user to the OIDC end_session endpoint (`:end-session-uri`).
   * The OIDC IdP should redirect the user to a preconfigured app URI.
-  * This is the Single Sign Out counterpart to Single Sign On (SSO).
+  * This is the *Single Sign Out* counterpart to *Single Sign On* (SSO).
   * This should clear any user sessions with the OIDC IdP, as well as the users ring session.
 
-* A `:logout-ring-uri` route will be added which will clear the ring session (but leave the OIDC IdP session intact).
-
+* A `:logout-ring-uri` route will be added which will clear the ring session and post to the OIDC revocation endpoint to revoke the refresh (and access) tokens.
+  * This is the *Log Out of this Device* option.
+  * This should end this session on this device, but not any other SSO sessions they may have.
 
 [ring]: https://github.com/ring-clojure/ring
 [oauth 2.0]: https://oauth.net/2/
@@ -76,6 +80,10 @@ Invoke a library API function from the command-line:
 Run the project's tests (they'll fail until you edit them):
 
     $ clojure -T:build test
+
+Run a specific test:
+
+    $ clj -M:test -v com.halo9000.ring-oidc-session-test/make-ring-logout-handler
 
 Run the project's CI pipeline and build a JAR (this will fail until you edit the tests to pass):
 

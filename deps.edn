@@ -6,7 +6,15 @@
         missionary/missionary      {:mvn/version "b.39"}
         org.clojure/tools.logging  {:mvn/version "1.2.4"}}
  :aliases
- {:test
+ {:dev
+  ; to load dev repl with src and test paths
+  {:extra-paths ["src-dev" "test"]
+   :extra-deps  {io.github.clojure/tools.build {:mvn/version "0.10.5"}
+                 org.clojure/test.check {:mvn/version "1.1.1"}
+                 io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                 ring/ring-mock {:mvn/version "0.4.0"}}}
+
+  :test
   ; `clj -M:test` to run tests
   ; see https://github.com/cognitect-labs/test-runner
   {:extra-paths ["test"]
@@ -22,9 +30,8 @@
              :main-opts ["-m" "cloverage.coverage" "-p" "src" "-s" "test" "-o" "target/coverage"]}
 
   ; see build.clj
-  :build {:deps {io.github.clojure/tools.build
-                 {:mvn/version "0.10.5"}
-                 slipset/deps-deploy {:mvn/version "0.2.2"}}
+  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}
+                 slipset/deps-deploy           {:mvn/version "0.2.2"}}
           :ns-default build}
 
   :deploy {:extra-deps {slipset/deps-deploy {:mvn/version "0.2.2"}}
