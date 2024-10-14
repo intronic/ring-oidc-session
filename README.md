@@ -93,20 +93,20 @@ This will produce an updated `pom.xml` file with synchronized dependencies insid
 directory inside `target/classes` and the JAR in `target`. You can update the version (and SCM tag)
 information in generated `pom.xml` by updating `build.clj`.
 
-Install it locally (requires the `ci` task be run first):
-
-    $ clojure -T:build install
-
 Apply (and push) the version tag to the git repo:
 
     $ clojure -T:build git-tag-version
 
 Deploy it to Clojars -- needs `CLOJARS_USERNAME` and `CLOJARS_PASSWORD` environment
-variables (requires the `ci` task be run first):
+variables (requires the `ci` & `git-tag-version` tasks be run first):
 
     $ clojure -T:build deploy
 
 Your library will be deployed to com.halo9000/ring-oidc-session on clojars.org by default.
+
+Install it locally (requires the `ci` task be run first):
+
+    $ clojure -T:build install
 
 ### Test coverage
 
